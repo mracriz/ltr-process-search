@@ -1,0 +1,23 @@
+# Ignore Python cache directories and files
+*.pyc
+__pycache__/
+**/__pycache__/
+*.py[cod]
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore virtual environments
+venv/
+env/
+.venv/
+
+build/
+dist/
+main.spec
+
+# Ignore system files
+.DS_Store
+
+# Ignore other untracked files (add any other specific files or directories you want to ignore)
+*.db
