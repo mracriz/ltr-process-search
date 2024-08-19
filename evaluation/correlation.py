@@ -1,7 +1,7 @@
 import pandas as pd
 from scipy.stats import kendalltau
 
-def calculate_kendall_tau(data_frames, on='predictions', query='qid', doc_id_col='doc_id'):
+def calculate_kendall_tau(data_frames, on='predictions_ranking_scores', query='query', doc_id_col='document'):
     """
     Calculate pairwise Kendall's Tau correlations between predictions from multiple datasets.
 
@@ -26,32 +26,6 @@ def calculate_kendall_tau(data_frames, on='predictions', query='qid', doc_id_col
         A dictionary containing pairwise Kendall's Tau correlations between all combinations of datasets.
         Keys are formatted as '{DataFrame1 Name} x {DataFrame2 Name}', where names are extracted from DataFrame objects.
         Values are Kendall's Tau coefficients averaged across query groups, or NaN if no valid comparisons could be made.
-
-    Examples:
-    ---------
-    # Example DataFrames
-    df1 = pd.DataFrame({
-        'qid': [1, 1, 2, 2],
-        'predictions': [0.8, 0.6, 0.7, 0.5],
-        'custom_doc_id': [101, 102, 201, 202]
-    })
-
-    df2 = pd.DataFrame({
-        'qid': [1, 1, 2, 2],
-        'predictions': [0.7, 0.5, 0.9, 0.4],
-        'custom_doc_id': [101, 102, 201, 202]
-    })
-
-    df3 = pd.DataFrame({
-        'qid': [1, 1, 2, 2],
-        'predictions': [0.9, 0.4, 0.8, 0.6],
-        'custom_doc_id': [101, 102, 201, 202]
-    })
-
-    # Calculate Kendall's Tau correlations
-    data_frames = [df1, df2, df3]
-    result = calculate_kendall_tau(data_frames, on='predictions', query='qid', doc_id_col='custom_doc_id')
-    print(result)
     """
     # Extract dataframe names for output keys
     df_names = [f'DF{i+1}' for i in range(len(data_frames))]
@@ -71,7 +45,8 @@ def calculate_kendall_tau(data_frames, on='predictions', query='qid', doc_id_col
 
 def group_kendall_tau(df, col1, col2, query, doc_id_col):
     """
-    Calculate Kendall's Tau correlation coefficient between two columns within each query group of a DataFrame.
+    Calculate Kendall's Tau correlation coefficient between two columns within each query group of a DataFrame,
+    handling ties by sorting the subgroup by doc_id_col only for tied values.
 
     Parameters:
     -----------
@@ -99,8 +74,21 @@ def group_kendall_tau(df, col1, col2, query, doc_id_col):
     tau_values = []
     for name, group in grouped:
         if len(group) > 1:  # Ensure there are at least two items to compare
+            # Sort each subgroup by col1 and col2 in descending order
             sorted_group_col1 = group.sort_values(by=[col1], ascending=False)
             sorted_group_col2 = group.sort_values(by=[col2], ascending=False)
+            
+            # Identify ties based on col1 and col2
+            ties_mask = (sorted_group_col1[col1].values == sorted_group_col2[col2].values)
+            
+            # Sort tied values by doc_id_col
+            if any(ties_mask):
+                sorted_group_col1.loc[ties_mask, doc_id_col] = sorted_group_col1.loc[ties_mask].sort_values(by=[doc_id_col])[doc_id_col].values
+                sorted_group_col2.loc[ties_mask, doc_id_col] = sorted_group_col2.loc[ties_mask].sort_values(by=[doc_id_col])[doc_id_col].values
+            
+            # Calculate Kendall's Tau for the sorted subgroups
             tau, _ = kendalltau(sorted_group_col1[doc_id_col], sorted_group_col2[doc_id_col])
             tau_values.append(tau)
+    
     return sum(tau_values) / len(tau_values) if tau_values else float('nan')
+
