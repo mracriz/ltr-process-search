@@ -9,32 +9,39 @@ import pandas as pd
 from manual_evaluation.must_have import MustHaveDataset
 from utils.utils import *
 
-musthave_path = '/Users/david/Downloads/' + '[Search] Busca Híbrida (Jusberto vs. ADA) - Av. objetiva.csv'
-musthave = pd.read_csv(musthave_path,header=1)
-goldenset = pd.read_csv('/Users/david/Downloads/goldenset_musthave.csv')
+musthave_path = '/Users/david/Downloads/' + 'Must Have GoldenSet - Página1.csv'
+musthave = pd.read_csv(musthave_path)
 
-musthave = musthave[~musthave['id'].isna()]
-musthave['id'] = musthave['id'].astype(int).astype(str)
+path_goldenset = '/Users/david/Documents/phd/JusBrasilData/sdbn_'
 
-musthave = musthave[~musthave['id.1'].isna()]
-musthave['id.1'] = musthave['id.1'].astype(int).astype(str)
+goldenset_copycopy = pd.read_csv(path_goldenset + 'copy_examcopy.csv')
+goldenset_copyclick = pd.read_csv(path_goldenset + 'copy_examclick.csv')
+goldenset_clickclick = pd.read_csv(path_goldenset + 'click_examclick.csv')
 
-musthave = musthave.rename(columns={'Consulta':'query', 'id.1':'doc_id'})
-
-musthave = musthave[ (musthave['Relevância.1'] == 'Relevante') & (musthave['Acertou?.1'] == 'Sim')]
-
-musthave['doc_id'] = musthave['doc_id'].apply(lambda x: 'JURISPRUDENCE:' + x)
-
-musthave['query'] = musthave['query'].apply(normalize_query)
+musthave = musthave.rename(columns={'document_id':'doc_id'})
 
 dataset = MustHaveDataset(musthave_df=musthave, query_column_name='query')
-dataset.set_goldenset(goldenset_df=goldenset, query_column_name='query')
-dataset.get_commom_queries()
 
+#Get intersection between sets
+intersection_queries = get_values_of_intersection([goldenset_clickclick, goldenset_clickclick, goldenset_copycopy],
+                                                  'query',
+                                                  musthave['query'].unique())
+
+goldenset_copycopy = filter_values_by_list(goldenset_copycopy, 'query', intersection_queries)
+goldenset_copyclick = filter_values_by_list(goldenset_copyclick, 'query', intersection_queries)
+goldenset_clickclick = filter_values_by_list(goldenset_clickclick, 'query', intersection_queries)
+
+print('Copy / examCopy')
+dataset.set_goldenset(goldenset_df=goldenset_copycopy, query_column_name='query')
 results = dataset.get_relevant_positions()
+print("MRR: ", dataset.calculate_mrr(results))
 
-for query, dict in results.items():
-    print(query)
-    for doc_id, position in dict.items():
-        print(doc_id, position)
-    print()
+print('Copy / examClick')
+dataset.set_goldenset(goldenset_df=goldenset_copyclick, query_column_name='query')
+results = dataset.get_relevant_positions()
+print("MRR: ", dataset.calculate_mrr(results))
+
+print('Click / examClick')
+dataset.set_goldenset(goldenset_df=goldenset_clickclick, query_column_name='query')
+results = dataset.get_relevant_positions()
+print("MRR: ", dataset.calculate_mrr(results))
