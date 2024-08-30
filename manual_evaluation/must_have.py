@@ -14,7 +14,7 @@ class MustHaveDataset():
         self.goldenset_df = goldenset_df
         self.goldesent_query_column_name = query_column_name
 
-    def get_commom_queries(self):
+    def get_commom_queries(self, to_print=True):
         common_queries = pd.merge(self.musthave_df[[self.musthave_query_column_name]], 
                                   self.goldenset_df[[self.goldesent_query_column_name]], 
                                   on=self.musthave_query_column_name)
@@ -22,13 +22,17 @@ class MustHaveDataset():
 
         self.common_queries = common_queries['query'].unique().tolist()
 
-        print(f"Number of common queries: {common_query_count}")
-        print("Common queries:")
-        print(common_queries['query'].unique())
+        if to_print == True:
+            print(f"Number of common queries: {common_query_count}")
+            print("Common queries:")
+            print(common_queries['query'].unique())
 
     def get_relevant_positions(self, relevance_score_column = 'beta_action_prob', musthave_doc_id_column = 'doc_id', goldenset_doc_id_column = 'doc_id'):
 
         results = {}
+
+        if self.common_queries is None:
+            self.get_commom_queries(to_print=False)
         
         for query in self.common_queries:
             
@@ -51,3 +55,28 @@ class MustHaveDataset():
             
         return results
 
+    @staticmethod
+    def calculate_mrr(queries_dict):
+        total_rank = 0.0
+        total_queries = len(queries_dict)
+        
+        for query, doc_positions in queries_dict.items():
+            found_relevant = False
+            query_rank = 0
+            
+            # Sort by position, handling None values by using a large number (e.g., float('inf'))
+            sorted_docs = sorted(doc_positions.items(), key=lambda x: x[1] if x[1] is not None else float('inf'))
+            
+            for rank, (doc_id, position) in enumerate(sorted_docs, 1):
+                if position is not None and position <= 10:  # Considering only top 10 positions
+                    query_rank = 1.0 / rank
+                    found_relevant = True
+                    break
+            
+            if not found_relevant:
+                query_rank = 0
+            
+            total_rank += query_rank
+        
+        mrr = total_rank / total_queries if total_queries > 0 else 0.0
+        return mrr
